@@ -38,7 +38,7 @@ createParcels()
           const gain = calculateRevenue(curr.weight);
           return acc + gain;
         }, 0);
-        console.log("Revenue made from orders : ", totalGain);
+        console.log("Revenue made from delivery : ", totalGain);
       })
       .catch((err) => {
         console.log(err);

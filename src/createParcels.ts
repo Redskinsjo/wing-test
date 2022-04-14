@@ -19,75 +19,61 @@ export const createParcels = async (): Promise<
   };
 
   let parcels: Array<Omit<Parcel, "tracking_id">> = [];
-  let sides: Array<OrderItem> = [];
 
-  // items are set to accepted until the 30kg are reached
-  for (let i = 0; i < orders.length; i++) {
-    const orderItems = orders[i].items.reduce(
-      (
-        acc: {
-          weight: 0;
-          accepted: OrderItem[];
-          rejected: OrderItem[];
-        },
-        curr: OrderItem
-      ) => {
-        const item = items.find((item) => item.id === curr.item_id);
-
-        if (item) {
-          const weight = Number(item.weight) * curr.quantity;
-
-          if (acc.weight + weight <= 30) {
-            acc.weight += weight;
-            acc.accepted.push(curr);
-            console.log("An item was added to a parcel : ", curr.item_id);
-          } else {
-            acc.rejected.push(curr);
-          }
-        } else {
-          console.error(
-            "An order item was not found into the stock :",
-            curr.item_id
-          );
-        }
-        return acc;
-      },
-      { weight: 0, accepted: [], rejected: [] }
-    );
-
-    const newParcel: Omit<Parcel, "tracking_id"> = {
-      order_id: orders[i].id,
-      items: orderItems.accepted,
-      weight: orderItems.weight,
-      palette_number: Math.ceil(parcels.length / 14),
-    };
-
-    parcels.push(newParcel);
-    sides.concat(orderItems.rejected);
-  }
-
-  // the rejected items are then added one by one to the parcel that are not full
-  sides.forEach((orderItem, index) => {
-    const item = items.find((item) => item.id === orderItem.item_id);
-    if (item) {
-      const weight = Number(item.weight) * orderItem.quantity;
-      const parcel = parcels.find((parcel) => parcel.weight + weight <= 30);
-      if (parcel) {
-        parcel.items.push(orderItem);
-        console.log("An item was added to a parcel : ", orderItem.item_id);
-        sides.splice(index, 1);
-      } else {
-        console.error(
-          "A parcel was not found for this orderItem",
-          orderItem.item_id
-        );
-      }
-    } else {
-      console.error(
-        "An order item was not found into the stock :",
-        orderItem.item_id
-      );
-    }
+  // Function creation of a new parcel
+  // with inputs: orderID, weight, items
+  const newParcel = ({
+    items,
+    weight,
+    order,
+  }: {
+    items: Array<OrderItem>;
+    weight: number;
+    order: Order;
+  }): Omit<Parcel, "tracking_id"> => ({
+    order_id: order.id,
+    items,
+    weight,
+    palette_number: Math.ceil(parcels.length / 14),
   });
+
+  // High complexity O3, will work on that to reduce looping time
+  // focus made on readability
+  for (let h = 0; h < orders.length; h++) {
+    const order = orders[h];
+
+    for (let i = 0; i < order.items.length; i++) {
+      const item = order.items[i];
+      const weight = Number(items.find((it) => it.id === item.item_id)?.weight);
+
+      for (let j = 0; j < item.quantity; j++) {
+        const parcel = parcels.find(
+          (p) => p.weight + weight <= 30 && p.order_id === order.id
+        );
+        // create a new parcel, if one for the same order and that has space doesn't exist
+        // with increment of quantity, weight and add of order ID
+        if (!parcel) {
+          parcels.push(
+            newParcel({ items: [{ ...item, quantity: 1 }], weight, order })
+          );
+        } else {
+          // otherwise add item to the existing parcel
+          const itemExists = parcel.items.find(
+            (it) => it.item_id === item.item_id
+          );
+          if (itemExists) {
+            itemExists.quantity++;
+            console.log(
+              "A new item was added to a parcel, order:",
+              parcel.order_id
+            );
+          } else {
+            parcel.items = [...parcel.items, item];
+          }
+          parcel.weight += weight;
+        }
+      }
+    }
+  }
   return parcels;
 };
